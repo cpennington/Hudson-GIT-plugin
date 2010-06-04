@@ -83,6 +83,7 @@ public class GitSCM extends SCM implements Serializable {
 	private PreBuildMergeOptions mergeOptions;
 
     private boolean doGenerateSubmoduleConfigurations;
+    private boolean dontCheckoutSubmodules;
 
 	private boolean clean;
 
@@ -111,6 +112,7 @@ public class GitSCM extends SCM implements Serializable {
             List<BranchSpec> branches,
             PreBuildMergeOptions mergeOptions,
             boolean doGenerateSubmoduleConfigurations,
+            boolean dontCheckoutSubmodules,
             Collection<SubmoduleConfig> submoduleCfg,
             boolean clean,
             String choosingStrategy, GitWeb browser) {
@@ -124,6 +126,7 @@ public class GitSCM extends SCM implements Serializable {
 		this.mergeOptions = mergeOptions;
 
 		this.doGenerateSubmoduleConfigurations = doGenerateSubmoduleConfigurations;
+		this.dontCheckoutSubmodules = dontCheckoutSubmodules;
 		this.submoduleCfg = submoduleCfg;
 
 		this.clean = clean;
@@ -144,6 +147,7 @@ public class GitSCM extends SCM implements Serializable {
     	   remoteRepositories = new ArrayList<RemoteConfig>();
    			branches = new ArrayList<BranchSpec>();
    			doGenerateSubmoduleConfigurations = false;
+   			dontCheckoutSubmodules = false;
    			mergeOptions = new PreBuildMergeOptions();
 
 
@@ -499,7 +503,7 @@ public class GitSCM extends SCM implements Serializable {
                        fetchFrom(git,localWorkspace,listener,remoteRepository);
                     }
 
-					if (git.hasGitModules()) {
+					if (git.hasGitModules() && !dontCheckoutSubmodules) {
 						git.submoduleInit();
 						git.submoduleUpdate();
 					}
@@ -633,8 +637,8 @@ public class GitSCM extends SCM implements Serializable {
 							git, listener, localWorkspace, submoduleCfg);
 					combinator.createSubmoduleCombinations();
 				}
-
-				if (git.hasGitModules()) {
+                
+				if (git.hasGitModules() && !dontCheckoutSubmodules) {
 					git.submoduleInit();
 					git.submoduleSync();
 
@@ -865,6 +869,7 @@ public class GitSCM extends SCM implements Serializable {
 					branches,
 					mergeOptions,
 				    req.getParameter("git.generate") != null,
+				    req.getParameter("git.dont_checkout_submodules") != null,
 					submoduleCfg,
 					req.getParameter("git.clean") != null,
                     req.getParameter("git.choosing_strategy"),
@@ -943,6 +948,10 @@ public class GitSCM extends SCM implements Serializable {
 	public boolean getDoGenerate() {
 		return this.doGenerateSubmoduleConfigurations;
 	}
+
+    public boolean getDontCheckoutSubmodules() {
+        return this.dontCheckoutSubmodules;
+    }
 
     public List<BranchSpec> getBranches()
     {
