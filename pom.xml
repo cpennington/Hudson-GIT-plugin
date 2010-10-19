@@ -3,17 +3,29 @@
   <parent>
     <groupId>org.jvnet.hudson.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>1.322</version>
+    <version>1.345</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
   <artifactId>git</artifactId>
-  <version>0.8.3-SNAPSHOT</version>
+  <version>1.1</version>
   <packaging>hpi</packaging>
   <name>Hudson GIT plugin</name>
   <description>Integrates Hudson to GIT SCM</description>
   <url>http://wiki.hudson-ci.org/display/HUDSON/Git+Plugin</url>
 
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>1.0-beta-1</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+  
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -43,23 +55,10 @@
     </repository>
     
     <repository>
-      <id>jgit-releases</id>
-      <url>http://fisheye4.atlassian.com/browse/~raw,r=trunk/hudson/trunk/hudson/plugins/git/maven-repository</url>
-      <!--
-      <url>https://guest:guest@hudson.dev.java.net/svn/hudson/trunk/hudson/plugins/git/maven-repository</url>
-      -->
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
+      <id>guice-maven</id>
+      <name>guice maven</name>
+      <url>http://guice-maven.googlecode.com/svn/trunk</url>
     </repository>
-      <repository>
-          <id>guice-maven</id>
-          <name>guice maven</name>
-          <url>http://guice-maven.googlecode.com/svn/trunk</url>
-      </repository>
   </repositories>
 
   <dependencies>
@@ -75,21 +74,23 @@
       <version>3.8.1</version>
       <scope>test</scope>
     </dependency>
-      <dependency>
-          <groupId>org.eclipse.jgit</groupId>
-          <artifactId>org.eclipse.jgit</artifactId>
-          <version>0.5.1.51-g96b2e76</version>
-          <scope>compile</scope>
-      </dependency>
-      <dependency>
-          <groupId>joda-time</groupId>
-          <artifactId>joda-time</artifactId>
-          <version>1.5.1</version>
-      </dependency>
-       <dependency>
-            <groupId>com.google.code.guice</groupId>
-            <artifactId>guice</artifactId>
-            <version>2.0.1</version>
-       </dependency>
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit</artifactId>
+      <version>0.5.1.51-g96b2e76</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>joda-time</groupId>
+      <artifactId>joda-time</artifactId>
+      <version>1.5.1</version>
+    </dependency>
   </dependencies>
+
+  <scm>
+    <connection>scm:git:git://github.com/hudson/Hudson-GIT-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:hudson/Hudson-GIT-plugin.git</developerConnection>
+    <url>http://github.com/hudson/Hudson-GIT-plugin</url>
+  </scm>
+
 </project>

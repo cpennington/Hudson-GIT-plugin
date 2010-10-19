@@ -68,7 +68,20 @@
   </f:entry>
 
   <f:advanced>
-         <!-- This needs more thought
+    <f:entry title="${%Excluded Regions}" help="/plugin/git/help-excludedRegions.html">
+        <f:textarea name="git.excludedRegions" value="${scm.excludedRegions}" />
+    </f:entry>
+    <f:entry title="${%Excluded Users}" help="/plugin/git/help-excludedUsers.html">
+        <f:textarea name="git.excludedUsers" value="${scm.excludedUsers}" />
+    </f:entry>
+    <f:entry title="Local branch to use (optional)" help="/plugin/git/help-localBranch.html">
+      <f:textbox name="git.localBranch" value="${scm.localBranch}" />
+    </f:entry>
+    <f:entry title="Local subdirectory for repo (optional)" help="/plugin/git/help-local.html">
+      <f:textbox name="git.relativeTargetDir" value="${scm.relativeTargetDir}" />
+    </f:entry>
+    
+    <!-- This needs more thought
   <f:entry title="Autogenerate submodule configurations">
     <f:checkbox name="git.generate" checked="${scm.doGenerate}"/>
     <label class="attach-previous">Generate submodule configurations</label>
@@ -104,7 +117,7 @@
 		                 checked="${scm.mergeOptions.doMerge()}">
 		 <f:entry title="Name of repository: (default first specified, e.g. origin)">
 		  <f:textbox id="git.mergeRemote" name="git.mergeRemote" value="${scm.mergeOptions.mergeRemote.name}"
-		             checkUrl="'${rootURL}/scm/GitSCM/gitRemoteNameCheck?value='+escape(this.value)
+		             checkUrl="'${rootURL}/scm/GitSCM/gitRemoteNameCheck?isMerge=true&amp;value='+escape(this.value)
 		                      +encodeAllInputs('&amp;', this.form, 'git.repo.name')
 		                      +encodeAllInputs('&amp;', this.form, 'git.repo.url')"/>
 		 </f:entry>
@@ -122,26 +135,45 @@
     <f:entry title="Clean after checkout" help="/plugin/git/clean.html">
       <f:checkbox name="git.clean" checked="${scm.clean}" />
     </f:entry>
-    <f:entry title="Choosing strategy" help="/plugin/git/choosingStrategy.html" field="git.choosing_strategy">
-        <select name="git.choosing_strategy">
-            <j:choose>
-                <j:when test="${empty(scm.choosingStrategy)}">
-                    <option value="${scm.DEFAULT}" selected="SELECTED">Default</option>
-                    <option value="${scm.GERRIT}">Gerrit</option>
-                </j:when>
-                <j:otherwise>
-                    <j:if test="${scm.choosingStrategy==scm.DEFAULT}">
-                        <option value="${scm.DEFAULT}" selected="SELECTED" >Default</option>
-                        <option value="${scm.GERRIT}">Gerrit</option>
-                    </j:if>
-                    <j:if test="${scm.choosingStrategy==scm.GERRIT}">
-                        <option value="${scm.DEFAULT}">Default</option>
-                        <option value="${scm.GERRIT}" selected="SELECTED">Gerrit</option>
-                    </j:if>
-                </j:otherwise>
-            </j:choose>
-        </select>
+    <f:entry title="Recursively update submodules" help="/plugin/git/help-recursiveSubmodules.html">
+      <f:checkbox name="git.recursiveSubmodules" checked="${scm.recursiveSubmodules}" />
     </f:entry>
+    <f:entry title="Use commit author in changelog" help="/plugin/git/help-authorCommitter.html">
+      <f:checkbox name="git.authorOrCommitter" checked="${scm.authorOrCommitter}"/>
+    </f:entry>
+    <f:entry title="Wipe out workspace" help="/plugin/git/wipeOutWorkspace.html">
+      <f:checkbox name="git.wipeOutWorkspace" checked="${scm.wipeOutWorkspace}" />
+    </f:entry>
+    <f:dropdownList name="buildChooser" title="${%Choosing strategy}" help="/plugin/git/choosingStrategy.html">
+      <j:scope>
+        <j:set var="current" value="${instance.buildChooser}"/>
+        <j:forEach var="descriptor" items="${descriptor.buildChooserDescriptors}">
+          <f:dropdownListBlock value="${descriptor.clazz.name}" title="${descriptor.displayName}"
+            selected="${current.descriptor==descriptor or (current==null and descriptor.displayName=='Default')}">
+            <j:set var="instance" value="${current.descriptor==descriptor ? current : null}" />
+            <tr><td>
+              <input type="hidden" name="stapler-class" value="${descriptor.clazz.name}" />
+            </td></tr>
+            <st:include from="${descriptor}" page="${descriptor.configPage}" optional="true"/>
+          </f:dropdownListBlock>
+        </j:forEach>
+      </j:scope>
+    </f:dropdownList>
+
+      <f:entry title="Git executable" field="git.gitTool">
+          <select name="git.gitTool">
+              <j:forEach var="gitTool" items="${descriptor.gitTools}" varStatus="current">
+                  <j:choose>
+                      <j:when test="${scm.gitTool==gitTool.name}">
+                          <option value="${gitTool.name}" selected="SELECTED">${gitTool.name}</option>
+                      </j:when>
+                      <j:otherwise>
+                          <option value="${gitTool.name}">${gitTool.name}</option>
+                      </j:otherwise>
+                  </j:choose>
+              </j:forEach>
+          </select>
+      </f:entry>
   </f:advanced>
   
   <t:listScmBrowsers name="git.browser" />

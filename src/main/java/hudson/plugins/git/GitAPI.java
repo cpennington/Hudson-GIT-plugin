@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -39,7 +40,7 @@ public class GitAPI implements IGitAPI {
     EnvVars environment;
 
     public GitAPI(String gitExe, FilePath workspace,
-            TaskListener listener, EnvVars environment) {
+                  TaskListener listener, EnvVars environment) {
 
         //listener.getLogger().println("Git API @ " + workspace.getName() + " / " + workspace.getRemote() + " - " + workspace.getChannel());
 
@@ -86,8 +87,8 @@ public class GitAPI implements IGitAPI {
 
         } catch (SecurityException ex) {
             throw new GitException(
-                    "Security error when trying to check for .git. Are you sure you have correct permissions?",
-                    ex);
+                                   "Security error when trying to check for .git. Are you sure you have correct permissions?",
+                                   ex);
         } catch (Exception e) {
             throw new GitException("Couldn't check for .git", e);
         }
@@ -102,8 +103,8 @@ public class GitAPI implements IGitAPI {
 
         } catch (SecurityException ex) {
             throw new GitException(
-                    "Security error when trying to check for .gitmodules. Are you sure you have correct permissions?",
-                    ex);
+                                   "Security error when trying to check for .gitmodules. Are you sure you have correct permissions?",
+                                   ex);
         } catch (Exception e) {
             throw new GitException("Couldn't check for .gitmodules", e);
         }
@@ -111,8 +112,8 @@ public class GitAPI implements IGitAPI {
 
     public void fetch(String repository, String refspec) throws GitException {
         listener.getLogger().println(
-                "Fetching upstream changes"
-                        + (repository != null ? " from " + repository : ""));
+                                     "Fetching upstream changes"
+                                     + (repository != null ? " from " + repository : ""));
 
         ArgumentListBuilder args = new ArgumentListBuilder();
         args.add(getGitExe(), "fetch", "-t");
@@ -125,7 +126,7 @@ public class GitAPI implements IGitAPI {
 
         try {
             if (launcher.launch().cmds(args).
-                    envs(environment).stdout(listener.getLogger()).pwd(workspace).join() != 0) {
+                envs(environment).stdout(listener.getLogger()).pwd(workspace).join() != 0) {
                 throw new GitException("Failed to fetch");
             }
         } catch (IOException e) {
@@ -165,18 +166,18 @@ public class GitAPI implements IGitAPI {
         try {
             workspace.act(new FileCallable<String>() {
 
-                private static final long serialVersionUID = 1L;
+                    private static final long serialVersionUID = 1L;
 
-                public String invoke(File workspace,
-                        VirtualChannel channel) throws IOException {
-                    final ArgumentListBuilder args = new ArgumentListBuilder();
-                    args.add("clone");
-                    args.add("-o", remoteConfig.getName());
-                    args.add(source);
-                    args.add(workspace.getAbsolutePath());
-                    return launchCommandIn(args, null);
-                }
-            });
+                    public String invoke(File workspace,
+                                         VirtualChannel channel) throws IOException {
+                        final ArgumentListBuilder args = new ArgumentListBuilder();
+                        args.add("clone");
+                        args.add("-o", remoteConfig.getName());
+                        args.add(source);
+                        args.add(workspace.getAbsolutePath());
+                        return launchCommandIn(args, null);
+                    }
+                });
         } catch (Exception e) {
             throw new GitException("Could not clone " + source, e);
         }
@@ -212,83 +213,53 @@ public class GitAPI implements IGitAPI {
         return line;
     }
 
-    private void log(String revFrom, String revTo, OutputStream fos, String... extraargs)
-            throws GitException {
-        String revSpec;
-        if (revFrom == null) {
-            revSpec = revTo;
-        } else {
-            revSpec = revFrom + ".." + revTo;
-        }
-        // Find the changes between our current working copy and now
+    public void changelog(String revFrom, String revTo, OutputStream outputStream) throws GitException {
+        whatchanged(revFrom, revTo, outputStream, "--no-abbrev", "-M", "--pretty=raw");
+    }
+
+    private void whatchanged(String revFrom, String revTo, OutputStream outputStream, String... extraargs) throws GitException {
+        String revSpec = revFrom + ".." + revTo;
+
         ArgumentListBuilder args = new ArgumentListBuilder();
-        args.add(getGitExe(), "log");
+        args.add(getGitExe(), "whatchanged");
         args.add(extraargs);
         args.add(revSpec);
 
         try {
-            if (launcher.launch().cmds(args).
-                    envs(environment).stdout(fos).pwd(workspace).join() != 0) {
-                throw new GitException("Error launching git log");
-            }
-
-        } catch (Exception e) {
-            throw new GitException("Error performing git log", e);
-        }
-    }
-
-    private void treeDiff(String rev, OutputStream fos, String... extraargs) throws GitException {
-        ArgumentListBuilder args = new ArgumentListBuilder();
-        args.add(getGitExe(), "diff-tree");
-        args.add(extraargs);
-        args.add(rev);
-
-        try {
-            fos.write("\n".getBytes());
-            if (launcher.launch().cmds(args).
-                    envs(environment).stdout(fos).pwd(workspace).join() != 0) {
-                throw new GitException("Error launching git diff-tree");
+            if (launcher.launch().cmds(args).envs(environment).stdout(
+                    outputStream).pwd(workspace).join() != 0) {
+                throw new GitException("Error launching git whatchanged");
             }
         } catch (Exception e) {
-            throw new GitException("Error performing git diff-tree", e);
+            throw new GitException("Error performing git whatchanged", e);
         }
     }
 
-    public void changelog(String revFrom, String revTo, OutputStream fos) throws GitException {
-        //log(revFrom, revTo, fos, "--name-status", "-M", "--summary", "--pretty=raw");
-        List<String> commits = getChangeLogCommits(revFrom, revTo);
-        for (String commit : commits) {
-            logCommit(commit, fos);
+    /**
+     * Given a Revision, show it as if it were an entry from git whatchanged, so that it
+     * can be parsed by GitChangeLogParser.
+     *
+     * @param r The Revision object
+     * @return The git show output, in List form.
+     * @throws GitException if errors were encountered running git show.
+     */
+    public List<String> showRevision(Revision r) throws GitException {
+        String revName = r.getSha1String();
+        String result = "";
+
+        if (revName != null) {
+            result = launchCommand("show", "--no-abbrev", "--format=raw", "-M", "--raw", revName);
         }
-    }
 
-    private List<String> getChangeLogCommits(String revFrom, String revTo) throws GitException {
-        ByteArrayOutputStream commitStream = new ByteArrayOutputStream();
-        log(revFrom, revTo, commitStream, "--pretty=format:%H"); // just the sha1
-        BufferedReader commitReader = new BufferedReader(new StringReader(commitStream.toString()));
-        ArrayList<String> commits = new ArrayList<String>();
-        try {
-            String line = commitReader.readLine();
-            while (line != null) {
-                commits.add(line);
-                line = commitReader.readLine();
-            }
-        } catch (Exception e) {
-            throw new GitException("Could not process change log", e);
-        } finally {
-            try {
-                commitStream.close();
-            } catch (IOException ioe) {
-            }
+        List<String> revShow = new ArrayList<String>();
+
+        if (result != null) {
+            revShow = new ArrayList<String>(Arrays.asList(result.split("\\n")));
         }
-        return commits;
-    }
 
-    private void logCommit(String commit, OutputStream fos) throws GitException {
-        log(null, commit, fos, "-M", "--summary", "--pretty=raw", "-n", "1");
-        treeDiff(commit, fos, "-M", "-r"); // Detect renames, recursive
+        return revShow;
     }
-
+    
     /**
      * Merge any changes into the head.
      *
@@ -325,10 +296,36 @@ public class GitAPI implements IGitAPI {
     /**
      * Update submodules.
      *
+     * @param recursive if true, will recursively update submodules (requires git>=1.6.5)
+     * 
      * @throws GitException if executing the Git command fails
      */
-    public void submoduleUpdate() throws GitException {
-        launchCommand("submodule", "update");
+    public void submoduleUpdate(boolean recursive) throws GitException {
+    	ArgumentListBuilder args = new ArgumentListBuilder();
+    	args.add("submodule", "update");
+    	if (recursive) {
+            args.add("--init", "--recursive");
+        }
+        
+        launchCommand(args);
+    }
+
+    /**
+     * Cleans submodules
+     *
+     * @param recursive if true, will recursively clean submodules (requres git>=1.6.5)
+     *
+     * @throws GitException if executing the git command fails
+     */
+    public void submoduleClean(boolean recursive) throws GitException {
+        ArgumentListBuilder args = new ArgumentListBuilder();
+        args.add("submodule", "foreach");
+    	if (recursive) {
+            args.add("--recursive");
+    	}
+    	args.add("git clean -fdx");
+    	
+    	launchCommand(args);
     }
 
     public void tag(String tagName, String comment) throws GitException {
@@ -372,7 +369,7 @@ public class GitAPI implements IGitAPI {
         try {
             args.prepend(getGitExe());
             int status = launcher.launch().cmds(args.toCommandArray()).
-                    envs(environment).stdout(fos).pwd(workDir).join();
+                envs(environment).stdout(fos).pwd(workDir).join();
 
             String result = fos.toString();
 
@@ -382,7 +379,8 @@ public class GitAPI implements IGitAPI {
 
             return result;
         } catch (Exception e) {
-            throw new GitException("Error performing " + StringUtils.join(args.toCommandArray(), " "), e);
+            throw new GitException("Error performing " + StringUtils.join(args.toCommandArray(), " ")
+                                   + "\n" + e.getMessage(), e);
         }
     }
 
@@ -398,8 +396,7 @@ public class GitAPI implements IGitAPI {
         // That are possible.
     }
 
-    private List<Branch> parseBranches(String fos) throws GitException
-    {
+    private List<Branch> parseBranches(String fos) throws GitException {
         // TODO: git branch -a -v --abbrev=0 would do this in one shot..
 
         List<Branch> tags = new ArrayList<Branch>();
@@ -410,8 +407,10 @@ public class GitAPI implements IGitAPI {
             while ((line = rdr.readLine()) != null) {
                 // Ignore the 1st
                 line = line.substring(2);
-                // Ignore '(no branch)'
-                if (!line.startsWith("(")) {
+                // Ignore '(no branch)' or anything with " -> ", since I think
+                // that's just noise
+                if ((!line.startsWith("("))
+                    && (line.indexOf(" -> ") == -1)) {
                     tags.add(new Branch(line, revParse(line)));
                 }
             }
@@ -431,10 +430,8 @@ public class GitAPI implements IGitAPI {
         Map<String, Ref> refs = db.getAllRefs();
         List<Branch> branches = new ArrayList<Branch>();
 
-        for(Ref candidate : refs.values())
-        {
-            if( candidate.getName().startsWith(Constants.R_REMOTES) )
-            {
+        for(Ref candidate : refs.values()) {
+            if(candidate.getName().startsWith(Constants.R_REMOTES)) {
                 Branch buildBranch = new Branch(candidate);
                 listener.getLogger().println("Seen branch in repository " + buildBranch.getName());
                 branches.add(buildBranch);
@@ -445,7 +442,7 @@ public class GitAPI implements IGitAPI {
     }
 
     public List<Branch> getBranchesContaining(String revspec)
-            throws GitException {
+        throws GitException {
         return parseBranches(launchCommand("branch", "-a", "--contains", revspec));
     }
 
@@ -457,6 +454,42 @@ public class GitAPI implements IGitAPI {
         }
     }
 
+    public void checkoutBranch(String branch, String ref) throws GitException {
+        try {
+            // First, checkout to detached HEAD, so we can delete the branch.
+            checkout(ref);
+            // Second, check to see if the branch actually exists, and then delete it if it does.
+            for (Branch b : getBranches()) {
+                if (b.name.equals(branch)) {
+                    deleteBranch(branch);
+                }
+            }
+            // Lastly, checkout the branch, creating it in the process, using ref as the start point.
+            launchCommand("checkout", "-b", branch, ref.toString());
+        } catch (GitException e) {
+            throw new GitException("Could not checkout " + branch + " with start point " + ref, e);
+        }
+    }
+    
+    public boolean tagExists(String tagName) throws GitException {
+        tagName = tagName.replace(' ', '_');
+
+        if (launchCommand("tag", "-l", tagName).trim().equals(tagName)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public void deleteBranch(String name) throws GitException {
+        try {
+            launchCommand("branch", "-D", name);
+        } catch (GitException e) {
+            throw new GitException("Could not delete branch " + name, e);
+        }
+
+    }
+    
     public void deleteTag(String tagName) throws GitException {
         tagName = tagName.replace(' ', '_');
         try {
@@ -476,7 +509,7 @@ public class GitAPI implements IGitAPI {
             while ((line = rdr.readLine()) != null) {
                 String[] entry = line.split("\\s+");
                 entries.add(new IndexEntry(entry[0], entry[1], entry[2],
-                        entry[3]));
+                                           entry[3]));
             }
         } catch (IOException e) {
             throw new GitException("Error parsing ls tree", e);
@@ -537,20 +570,18 @@ public class GitAPI implements IGitAPI {
         }
     }
 
-    public void fetch(RemoteConfig remoteRepository) throws GitException
-    {
+    public void fetch(RemoteConfig remoteRepository) throws GitException {
         // Assume there is only 1 URL / refspec for simplicity
         fetch(remoteRepository.getURIs().get(0).toString(), remoteRepository.getFetchRefSpecs().get(0).toString());
 
     }
 
-    public ObjectId mergeBase(ObjectId id1, ObjectId id2)
-    {
+    public ObjectId mergeBase(ObjectId id1, ObjectId id2) {
         try {
-             String result;
-             try {
-                 result = launchCommand("merge-base", id1.name(), id2.name());
-             } catch (GitException ge) {
+            String result;
+            try {
+                result = launchCommand("merge-base", id1.name(), id2.name());
+            } catch (GitException ge) {
                 return null;
             }
 
@@ -573,13 +604,11 @@ public class GitAPI implements IGitAPI {
         return launchCommand("log", "--all", "--pretty=format:'%H#%ct'", branch);
     }
 
-    private Repository getRepository() throws IOException
-    {
+    private Repository getRepository() throws IOException {
         return new Repository(new File(workspace.getRemote(), ".git"));
     }
 
-    public List<Tag> getTagsOnCommit(String revName) throws GitException, IOException
-    {
+    public List<Tag> getTagsOnCommit(String revName) throws GitException, IOException {
         Repository db = getRepository();
         ObjectId commit = db.resolve(revName);
         List<Tag> ret = new ArrayList<Tag>();
@@ -587,8 +616,7 @@ public class GitAPI implements IGitAPI {
         for (final Map.Entry<String, Ref> tag : db.getTags().entrySet()) {
 
             Tag ttag = db.mapTag(tag.getKey());
-            if( ttag.getObjId().equals(commit) )
-            {
+            if(ttag.getObjId().equals(commit)) {
                 ret.add(ttag);
             }
         }
@@ -603,7 +631,7 @@ public class GitAPI implements IGitAPI {
 
             ByteArrayOutputStream fos = new ByteArrayOutputStream();
             int status = launcher.launch().cmds(args).
-                    envs(environment).stdout(fos).pwd(workspace).join();
+                envs(environment).stdout(fos).pwd(workspace).join();
             String result = fos.toString();
 
             if (status != 0) {
